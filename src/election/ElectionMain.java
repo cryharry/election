@@ -1,25 +1,94 @@
 package election;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.TooManyListenersException;
 
+import javax.comm.CommPortIdentifier;
+import javax.comm.PortInUseException;
+import javax.comm.SerialPort;
+import javax.comm.SerialPortEvent;
+import javax.comm.SerialPortEventListener;
+import javax.comm.UnsupportedCommOperationException;
 import javax.swing.JFrame;
 
 public class ElectionMain {
+	static CommPortIdentifier portId;
+	static Enumeration portList;
+	InputStream input;
+	SerialPort serialPort;
+	Thread readThread;
+	
 	JFrame jFrame = new JFrame("선거");
 	Connection con;
 	PreparedStatement pstmt;
 	ResultSet rs;
+	String rfcard = "";
 	String sql = "";
 	
 	public ElectionMain() {
-		con = dbConn();
-		sql = "SELECT class,ban,num,name FROM student WHERE rf_card_num=?";
+		try {
+		    serialPort = (SerialPort) portId.open("SimpleReadApp", 2000);
+			input = serialPort.getInputStream();
+		    serialPort.addEventListener(new SerialPortEventListener() {
+				@Override
+				public void serialEvent(SerialPortEvent event) {
+					switch (event.getEventType()) {
+					case SerialPortEvent.BI:
+					case SerialPortEvent.OE:
+					case SerialPortEvent.FE:
+					case SerialPortEvent.PE:
+					case SerialPortEvent.CD:
+					case SerialPortEvent.CTS:
+					case SerialPortEvent.DSR:
+					case SerialPortEvent.RI:
+					case SerialPortEvent.OUTPUT_BUFFER_EMPTY:
+				    break;
+				    
+					case SerialPortEvent.DATA_AVAILABLE:
+				    byte[] readBuffer = new byte[20];
+				    try {
+				    	while (input.available() > 0) {
+						    int numBytes = input.read(readBuffer);
+				    	}
+				    	rfcard =  new String(readBuffer,1,10);
+				    	
+				    	setRF(rfcard);
+				    } catch (IOException e) {}
+				    break;
+					}
+				}
+			});
+		    serialPort.notifyOnDataAvailable(true);
+		    serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, 
+					   SerialPort.STOPBITS_1, 
+					   SerialPort.PARITY_NONE);
+		} catch (Exception e) {}		
+		/*readThread = new Thread(this);
+		readThread.start();*/
 		
-		 
+		System.out.println(rfcard);
+		con = dbConn();
+		sql = "SELECT class,ban,num,name FROM student WHERE rf_card_num="+rfcard;
+				 
+	}
+	public void setRF(String rfcard) {
+		this.rfcard = rfcard;
+	}
+	public String getRF() {
+		return this.rfcard;
+	}
+	
+	public void run() {
+		try {
+		    Thread.sleep(20000);
+		} catch (InterruptedException e) {}
 	}
 	
 	public Connection dbConn() {
@@ -46,7 +115,15 @@ public class ElectionMain {
 	
 	
 	public static void main(String[] args) {
-		new ElectionMain();
+		portList = CommPortIdentifier.getPortIdentifiers();
+		while (portList.hasMoreElements()) {
+		    portId = (CommPortIdentifier) portList.nextElement();
+		    if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
+				if (portId.getName().equals("COM1")) {
+				    ElectionMain reader = new ElectionMain();
+				} 
+		    } 
+		} 
 	}
 
 }

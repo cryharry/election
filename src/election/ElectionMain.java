@@ -1,6 +1,5 @@
 package election;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -8,17 +7,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.TooManyListenersException;
-
 import javax.comm.CommPortIdentifier;
-import javax.comm.PortInUseException;
 import javax.comm.SerialPort;
 import javax.comm.SerialPortEvent;
 import javax.comm.SerialPortEventListener;
-import javax.comm.UnsupportedCommOperationException;
 import javax.swing.JFrame;
 
-public class ElectionMain {
+public class ElectionMain implements Runnable{
 	static CommPortIdentifier portId;
 	static Enumeration portList;
 	InputStream input;
@@ -29,7 +24,6 @@ public class ElectionMain {
 	Connection con;
 	PreparedStatement pstmt;
 	ResultSet rs;
-	String rfcard = "";
 	String sql = "";
 	
 	public ElectionMain() {
@@ -57,10 +51,19 @@ public class ElectionMain {
 				    	while (input.available() > 0) {
 						    int numBytes = input.read(readBuffer);
 				    	}
-				    	rfcard =  new String(readBuffer,1,10);
-				    	
-				    	setRF(rfcard);
-				    } catch (IOException e) {}
+				    	String rfcard = new String(readBuffer,1,10);
+				    	con = dbConn();
+						sql = "SELECT class,ban,num,name FROM student WHERE rf_card_num="+rfcard;
+						pstmt = con.prepareStatement(sql);
+						rs = pstmt.executeQuery();
+						if(rs.next()) {
+							
+						} else {
+							
+						}
+				    } catch (Exception e) {
+				    	e.printStackTrace();
+				    }
 				    break;
 					}
 				}
@@ -70,19 +73,9 @@ public class ElectionMain {
 					   SerialPort.STOPBITS_1, 
 					   SerialPort.PARITY_NONE);
 		} catch (Exception e) {}		
-		/*readThread = new Thread(this);
-		readThread.start();*/
-		
-		System.out.println(rfcard);
-		con = dbConn();
-		sql = "SELECT class,ban,num,name FROM student WHERE rf_card_num="+rfcard;
+		readThread = new Thread(this);
+		readThread.start();
 				 
-	}
-	public void setRF(String rfcard) {
-		this.rfcard = rfcard;
-	}
-	public String getRF() {
-		return this.rfcard;
 	}
 	
 	public void run() {

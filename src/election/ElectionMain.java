@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Calendar;
@@ -33,16 +34,20 @@ public class ElectionMain implements Runnable{
 	InputStream input;
 	SerialPort serialPort;
 	Thread readThread;
+	JImagePanel imagePanel = new JImagePanel();
 	
 	JFrame jFrame = new JFrame("선거");
 	JPanel topPanel = new JPanel(new GridLayout(2,1));
 	JPanel northPanel = new JPanel(new FlowLayout());
-	String stringLabel[] = {"성 명","학년","반","번호","과"};
-	int textFiled[] = {10,2,2,2,30};
+	JTextField jTextFieldName = new JTextField(10);
+	JTextField jTextFieldClass= new JTextField(2);
+	JTextField jTextFieldBan = new JTextField(2);
+	JTextField jTextFieldNum = new JTextField(2);
 	Connection con;
 	PreparedStatement pstmt;
-	ResultSet rs;
+	ResultSet rs, rs2, rs3;
 	String sql = "";
+	String[] splitString;
 	
 	public ElectionMain() {
 		JPanel elecTitle = new JPanel(new FlowLayout());
@@ -53,29 +58,22 @@ public class ElectionMain implements Runnable{
 		elecTitle.add(yearLabel);
 		JLabel titleLabel = new JLabel("년도");
 		elecTitle.add(titleLabel);
-		con = dbConn();
-		sql = "SELECT subject FROM Election_Cand WHERE sort=1";
-		try {
-			pstmt = con.prepareStatement(sql);
-			rs = pstmt.executeQuery();
-			if(rs.next()) {
-				JLabel elecLabel = new JLabel(rs.getString("subject"));
-				elecTitle.add(elecLabel);
-			} else {
-				System.out.println("a");
-			}
-		} catch (SQLException e1) {
-			e1.printStackTrace();
-		}
-
+		JLabel elecString = new JLabel();
+		elecTitle.add(elecString);
+		elecString.setText(getElecTitle(0));
 		JLabel titleLabel2 = new JLabel("선거 투표");
 		elecTitle.add(titleLabel2);
 		topPanel.add(elecTitle);
 		
-		for(int i=0; i<stringLabel.length;i++) {
-			northPanel.add(new JLabel(stringLabel[i]));
-			northPanel.add(new JTextField(textFiled[i]));
-		}
+		northPanel.add(new JLabel("성 명"));
+		northPanel.add(jTextFieldName);
+		northPanel.add(new JLabel("학년"));
+		northPanel.add(jTextFieldClass);
+		northPanel.add(new JLabel("반"));
+		northPanel.add(jTextFieldBan);
+		northPanel.add(new JLabel("번 호"));
+		northPanel.add(jTextFieldNum);
+		
 		topPanel.add(northPanel);
 		jFrame.add(topPanel,"North");
 		
@@ -113,13 +111,32 @@ public class ElectionMain implements Runnable{
 						    int numBytes = input.read(readBuffer);
 				    	}
 				    	String rfcard = new String(readBuffer,1,10);
-						sql = "SELECT class,ban,num,name FROM student WHERE rf_card_num='"+rfcard+"'";
+				    	con = dbConn();
+						sql = "SELECT name,class,ban,num FROM student WHERE rf_card_num='"+rfcard+"'";
 						Statement stmt = con.createStatement();
 						rs = stmt.executeQuery(sql);
 						if(rs.next()) {
 							centerPanel.remove(checkLabel);
+							jTextFieldName.setText(rs.getString("name"));
+							jTextFieldClass.setText(String.valueOf(rs.getInt("class")));
+							jTextFieldBan.setText(String.valueOf(rs.getInt("ban")));
+							jTextFieldNum.setText(String.valueOf(rs.getInt("num")));
+							String sql2 = "SELECT st_id FROM Election_Cand WHERE subject='1학년 학생회장'";
+							pstmt = con.prepareStatement(sql2);
+							rs2 = pstmt.executeQuery();
+							int size = 0;
+							while(rs2.next()){
+								size++;
+							}
+							JPanel[] panelImage = new JPanel[size];
 							JPanel elecImage= new JPanel(new GridLayout(1, 3));
-							elecImage.add(new JButton("테스트"));
+							String sql3 = "SELECT st_id FROM Election_Cand WHERE subject='1학년 학생회장'";
+							pstmt = con.prepareStatement(sql3);
+							rs3 = pstmt.executeQuery();
+							while(rs3.next()) {
+								panelImage[rs3.getRow()-1] = imagePanel.getPanel(rs3.getString("st_id"));
+								elecImage.add(panelImage[rs3.getRow()-1]);
+							}
 							centerPanel.add(elecImage);
 							jFrame.setVisible(false);
 							jFrame.setVisible(true);
@@ -141,6 +158,22 @@ public class ElectionMain implements Runnable{
 		readThread = new Thread(this);
 		readThread.start();
 				 
+	}
+	public String getElecTitle(int i) {
+		con = dbConn();
+		sql = "SELECT DISTINCT(subject) FROM Election_Cand";
+		try {
+			pstmt = con.prepareStatement(sql);
+			rs = pstmt.executeQuery();
+			String elecString = "";
+			while(rs.next()) {
+				elecString += rs.getString("subject")+",";
+			}
+			splitString = elecString.split(",");	
+		} catch (SQLException e1) {
+			e1.printStackTrace();
+		} 
+		return splitString[i];
 	}
 	
 	public void run() {

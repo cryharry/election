@@ -44,10 +44,11 @@ public class ElectionMain implements Runnable{
 	JTextField elecText = new JTextField(2);
 	JLabel elecLabel = new JLabel("기호");
 	Connection con;
-	PreparedStatement pstmt;
-	ResultSet rs, rs2, rs3;
-	String sql = "", e_st = "";
+	PreparedStatement pstmt, distPstmt;
+	ResultSet rs, rs2, rs3, distRs, distRsSize;
+	String sql = "", e_st = "", distSql = "", st_id = "";
 	String[] splitString;
+	Boolean flag;
 	
 	public ElectionMain() { 
 		JPanel elecTitle = new JPanel(new FlowLayout());
@@ -112,8 +113,9 @@ public class ElectionMain implements Runnable{
 				    	while (input.available() > 0) {
 						    int numBytes = input.read(readBuffer);
 				    	}
-				    	String rfcard = new String(readBuffer,0,10);
-				    	String st_id;
+				    	flag = false;
+				    	String rfcard = new String(readBuffer,1,10);
+				    	
 				    	con = dbConn();
 						sql = "SELECT name,class,ban,num,st_id FROM student WHERE rf_card_num='"+rfcard+"'";
 						Statement stmt = con.createStatement();
@@ -129,67 +131,27 @@ public class ElectionMain implements Runnable{
 							jTextFieldNum.setText(String.valueOf(rs.getInt("num")));
 							jTextFieldNum.setEditable(false);
 							st_id = rs.getString("st_id");
-							sql = "SELECT st_id FROM Election_Cand WHERE subject='1학년 학생회장'";
-							pstmt = con.prepareStatement(sql);
-							rs = pstmt.executeQuery();
-							int size = 0;
-							while(rs.next()) {
-								size++;
+							distSql = "SELECT DISTINCT subject FROM Election_Cand";
+							distPstmt = con.prepareStatement(distSql);
+							distRsSize = distPstmt.executeQuery();
+							int rsSize = 0;
+							while(distRsSize.next()) {
+								rsSize++;
 							}
-							pstmt = con.prepareStatement(sql);
-							rs2 = pstmt.executeQuery();
-							String e_st_id[] = new String[size];
-							JPanel elecImage= new JPanel(new FlowLayout());
-							while(rs2.next()) {
-								e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
-								String filePath = "C:\\Uni_cool\\image\\"+rs2.getString("st_id")+".jpg";
-								ImageIcon icon = new ImageIcon(filePath);
-								if(icon != null) {
-									ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 200, 200));
-									elecImage.add(new JLabel(thumbnailIcon));
-								}
-								centerPanel.add(elecImage);
+							String subjectStr[] = new String[rsSize];
+							distSql = "SELECT DISTINCT subject FROM Election_Cand";
+							distPstmt = con.prepareStatement(distSql);
+							distRs = distPstmt.executeQuery();
+							while(distRs.next()) {
+								subjectStr[distRs.getRow()-1] = distRs.getString("subject");
 							}
-							
-							
-							jFrame.add(centerPanel);
-							elecText.requestFocus();
-							elecText.addKeyListener(new KeyListener() {
-								@Override
-								public void keyTyped(KeyEvent e) {
-								}
-								@Override
-								public void keyReleased(KeyEvent e) {
-								}
-								
-								@Override
-								public void keyPressed(KeyEvent e) {
-									switch (e.getKeyCode()) {
-									case 97:
-										e_st=e_st_id[0];
-										break;
-									case 98:
-										e_st=e_st_id[1];
-										break;
-									case 99:
-										e_st=e_st_id[2];
-										break;
-									default:
-										break;
-									}
-									if(e.getKeyCode() == 10) {
-										sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
-										try {
-											pstmt = con.prepareStatement(sql);
-											pstmt.executeUpdate();
-										} catch (SQLException e1) {
-											e1.printStackTrace();
-										}
-									}
-								}
-							});
-							//jFrame.setVisible(false);
+							countElec(subjectStr[0]);
 							jFrame.setVisible(true);
+							if(flag){
+								centerPanel.removeAll();
+								countElec(subjectStr[1]);
+								jFrame.setVisible(true);
+							}
 						} else {
 							//System.out.println("b");
 						}
@@ -199,6 +161,76 @@ public class ElectionMain implements Runnable{
 				    break;
 					}
 				}
+
+
+				private void countElec(String str) {
+					sql = "SELECT st_id FROM Election_Cand WHERE subject='"+str+"'";
+					try {
+						pstmt = con.prepareStatement(sql);
+						rs = pstmt.executeQuery();
+						int size = 0;
+						while(rs.next()) {
+							size++;
+						}
+						pstmt = con.prepareStatement(sql);
+						rs2 = pstmt.executeQuery();
+						String e_st_id[] = new String[size];
+						JPanel elecImage= new JPanel(new FlowLayout());
+						while(rs2.next()) {
+							e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
+							String filePath = "C:\\Uni_cool\\image\\"+rs2.getString("st_id")+".jpg";
+							ImageIcon icon = new ImageIcon(filePath);
+							if(icon != null) {
+								ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 200, 200));
+								elecImage.add(new JLabel(thumbnailIcon));
+							}
+							centerPanel.add(elecImage);
+						}
+						
+						
+						jFrame.add(centerPanel);
+						elecText.requestFocus();
+						elecText.addKeyListener(new KeyListener() {
+							@Override
+							public void keyTyped(KeyEvent e) {
+							}
+							@Override
+							public void keyReleased(KeyEvent e) {
+							}
+							
+							@Override
+							public void keyPressed(KeyEvent e) {
+								switch (e.getKeyCode()) {
+								case 97:
+									e_st=e_st_id[0];
+									break;
+								case 98:
+									e_st=e_st_id[1];
+									break;
+								case 99:
+									e_st=e_st_id[2];
+									break;
+								default:
+									break;
+								}
+								if(e.getKeyCode() == 10) {
+									sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
+									try {
+										pstmt = con.prepareStatement(sql);
+										pstmt.executeUpdate();
+										elecText.setText("");
+										flag = true;
+									} catch (SQLException e1) {
+										e1.printStackTrace();
+									}
+								}
+							}
+						});
+					} catch (SQLException e2) {
+						e2.printStackTrace();
+					}
+				}
+
 
 				private Image getScaledImage(Image image, int i, int j) {
 					BufferedImage resizedImg = new BufferedImage(i, j, BufferedImage.TYPE_INT_RGB);

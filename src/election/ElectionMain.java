@@ -25,6 +25,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
+import jdk.nashorn.internal.ir.Flags;
+
 
 public class ElectionMain implements Runnable{
 	static CommPortIdentifier portId;
@@ -33,10 +35,10 @@ public class ElectionMain implements Runnable{
 	SerialPort serialPort;
 	Thread readThread;
 	
-	
 	JFrame jFrame = new JFrame("선거");
 	JPanel topPanel = new JPanel(new GridLayout(2,1));
 	JPanel northPanel = new JPanel(new FlowLayout());
+	JPanel centerPanel = new JPanel(new FlowLayout());
 	JTextField jTextFieldName = new JTextField(10);
 	JTextField jTextFieldClass= new JTextField(2);
 	JTextField jTextFieldBan = new JTextField(2);
@@ -48,7 +50,7 @@ public class ElectionMain implements Runnable{
 	ResultSet rs, rs2, rs3, distRs, distRsSize;
 	String sql = "", e_st = "", distSql = "", st_id = "";
 	String[] splitString;
-	Boolean flag;
+	Boolean flag = false;
 	
 	public ElectionMain() { 
 		JPanel elecTitle = new JPanel(new FlowLayout());
@@ -78,9 +80,8 @@ public class ElectionMain implements Runnable{
 		northPanel.add(elecText);
 		
 		topPanel.add(northPanel);
-		jFrame.add(topPanel,"North");
+		jFrame.add(topPanel,"North");	
 		
-		JPanel centerPanel = new JPanel(new FlowLayout());
 		JLabel checkLabel = new JLabel("학생증을 체크해주세요!");
 		centerPanel.add(checkLabel);
 		
@@ -113,7 +114,7 @@ public class ElectionMain implements Runnable{
 				    	while (input.available() > 0) {
 						    int numBytes = input.read(readBuffer);
 				    	}
-				    	flag = false;
+				    	
 				    	String rfcard = new String(readBuffer,1,10);
 				    	
 				    	con = dbConn();
@@ -147,7 +148,7 @@ public class ElectionMain implements Runnable{
 							}
 							countElec(subjectStr[0]);
 							jFrame.setVisible(true);
-							if(flag){
+							if(getFlag()){
 								centerPanel.removeAll();
 								countElec(subjectStr[1]);
 								jFrame.setVisible(true);
@@ -160,85 +161,6 @@ public class ElectionMain implements Runnable{
 				    }
 				    break;
 					}
-				}
-
-
-				private void countElec(String str) {
-					sql = "SELECT st_id FROM Election_Cand WHERE subject='"+str+"'";
-					try {
-						pstmt = con.prepareStatement(sql);
-						rs = pstmt.executeQuery();
-						int size = 0;
-						while(rs.next()) {
-							size++;
-						}
-						pstmt = con.prepareStatement(sql);
-						rs2 = pstmt.executeQuery();
-						String e_st_id[] = new String[size];
-						JPanel elecImage= new JPanel(new FlowLayout());
-						while(rs2.next()) {
-							e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
-							String filePath = "C:\\Uni_cool\\image\\"+rs2.getString("st_id")+".jpg";
-							ImageIcon icon = new ImageIcon(filePath);
-							if(icon != null) {
-								ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 200, 200));
-								elecImage.add(new JLabel(thumbnailIcon));
-							}
-							centerPanel.add(elecImage);
-						}
-						
-						
-						jFrame.add(centerPanel);
-						elecText.requestFocus();
-						elecText.addKeyListener(new KeyListener() {
-							@Override
-							public void keyTyped(KeyEvent e) {
-							}
-							@Override
-							public void keyReleased(KeyEvent e) {
-							}
-							
-							@Override
-							public void keyPressed(KeyEvent e) {
-								switch (e.getKeyCode()) {
-								case 97:
-									e_st=e_st_id[0];
-									break;
-								case 98:
-									e_st=e_st_id[1];
-									break;
-								case 99:
-									e_st=e_st_id[2];
-									break;
-								default:
-									break;
-								}
-								if(e.getKeyCode() == 10) {
-									sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
-									try {
-										pstmt = con.prepareStatement(sql);
-										pstmt.executeUpdate();
-										elecText.setText("");
-										flag = true;
-									} catch (SQLException e1) {
-										e1.printStackTrace();
-									}
-								}
-							}
-						});
-					} catch (SQLException e2) {
-						e2.printStackTrace();
-					}
-				}
-
-
-				private Image getScaledImage(Image image, int i, int j) {
-					BufferedImage resizedImg = new BufferedImage(i, j, BufferedImage.TYPE_INT_RGB);
-			        Graphics2D g2 = resizedImg.createGraphics();
-			        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-			        g2.drawImage(image, 0, 0, i, j, null);
-			        g2.dispose();
-			        return resizedImg;
 				}
 			});
 		    serialPort.notifyOnDataAvailable(true);
@@ -295,6 +217,88 @@ public class ElectionMain implements Runnable{
 		sql = "";
 	}
 	
+	public Image getScaledImage(Image image, int i, int j) {
+		BufferedImage resizedImg = new BufferedImage(i, j, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = resizedImg.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(image, 0, 0, i, j, null);
+        g2.dispose();
+        return resizedImg;
+	}
+	
+	public Boolean getFlag() {
+		return this.flag;
+	}
+	
+	public void setFlag(Boolean flag) {
+		this.flag = flag;
+	}
+	
+	public void countElec(String str) {
+		sql = "SELECT st_id FROM Election_Cand WHERE subject='"+str+"'";
+		try {
+			pstmt = con.prepareStatement(sql);
+			rs = pstmt.executeQuery();
+			int size = 0;
+			while(rs.next()) {
+				size++;
+			}
+			pstmt = con.prepareStatement(sql);
+			rs2 = pstmt.executeQuery();
+			String e_st_id[] = new String[size];
+			JPanel elecImage= new JPanel(new FlowLayout());
+			while(rs2.next()) {
+				e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
+				String filePath = "C:\\Uni_cool\\image\\"+rs2.getString("st_id")+".jpg";
+				ImageIcon icon = new ImageIcon(filePath);
+				if(icon != null) {
+					ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 200, 200));
+					elecImage.add(new JLabel(thumbnailIcon));
+				}
+				centerPanel.add(elecImage);
+			}		
+			jFrame.add(centerPanel);
+			elecText.requestFocus();
+			elecText.addKeyListener(new KeyListener() {
+				@Override
+				public void keyTyped(KeyEvent e) {
+				}
+				@Override
+				public void keyReleased(KeyEvent e) {
+				}
+				
+				@Override
+				public void keyPressed(KeyEvent e) {
+					switch (e.getKeyCode()) {
+					case 97:
+						e_st=e_st_id[0];
+						break;
+					case 98:
+						e_st=e_st_id[1];
+						break;
+					case 99:
+						e_st=e_st_id[2];
+						break;
+					default:
+						break;
+					}
+					if(e.getKeyCode() == 10) {
+						sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
+						try {
+							pstmt = con.prepareStatement(sql);
+							pstmt.executeUpdate();
+							elecText.setText("");
+							setFlag(true);
+						} catch (SQLException e1) {
+							e1.printStackTrace();
+						} 
+					}
+				}
+			});
+		} catch (SQLException e2) {
+			e2.printStackTrace();
+		}
+	}
 	
 	public static void main(String[] args) {
 		portList = CommPortIdentifier.getPortIdentifiers();

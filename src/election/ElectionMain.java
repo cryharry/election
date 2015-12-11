@@ -25,6 +25,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
+import com.sun.xml.internal.bind.v2.runtime.reflect.Accessor.SetterOnlyReflection;
+
 import jdk.nashorn.internal.ir.Flags;
 
 
@@ -34,6 +36,8 @@ public class ElectionMain implements Runnable{
 	InputStream input;
 	SerialPort serialPort;
 	Thread readThread;
+	String rfcard;
+	int count = 0;
 	
 	JFrame jFrame = new JFrame("선거");
 	JPanel topPanel = new JPanel(new GridLayout(2,1));
@@ -51,6 +55,8 @@ public class ElectionMain implements Runnable{
 	String sql = "", e_st = "", distSql = "", st_id = "";
 	String[] splitString;
 	Boolean flag = false;
+	JLabel elecString = new JLabel();
+	JLabel checkLabel = new JLabel("학생증을 체크해주세요!");
 	
 	public ElectionMain() { 
 		JPanel elecTitle = new JPanel(new FlowLayout());
@@ -61,7 +67,6 @@ public class ElectionMain implements Runnable{
 		elecTitle.add(yearLabel);
 		JLabel titleLabel = new JLabel("년도");
 		elecTitle.add(titleLabel);
-		JLabel elecString = new JLabel();
 		elecTitle.add(elecString);
 		elecString.setText(getElecTitle(0));
 		JLabel titleLabel2 = new JLabel("선거 투표");
@@ -82,9 +87,7 @@ public class ElectionMain implements Runnable{
 		topPanel.add(northPanel);
 		jFrame.add(topPanel,"North");	
 		
-		JLabel checkLabel = new JLabel("학생증을 체크해주세요!");
 		centerPanel.add(checkLabel);
-		
 		jFrame.add(centerPanel,"Center");
 		
 		jFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
@@ -114,51 +117,11 @@ public class ElectionMain implements Runnable{
 				    	while (input.available() > 0) {
 						    int numBytes = input.read(readBuffer);
 				    	}
-				    	
-				    	String rfcard = new String(readBuffer,1,10);
-				    	
-				    	con = dbConn();
-						sql = "SELECT name,class,ban,num,st_id FROM student WHERE rf_card_num='"+rfcard+"'";
-						Statement stmt = con.createStatement();
-						rs = stmt.executeQuery(sql);
-						if(rs.next()) {
-							centerPanel.remove(checkLabel);
-							jTextFieldName.setText(rs.getString("name"));
-							jTextFieldName.setEditable(false);
-							jTextFieldClass.setText(String.valueOf(rs.getInt("class")));
-							jTextFieldClass.setEditable(false);
-							jTextFieldBan.setText(String.valueOf(rs.getInt("ban")));
-							jTextFieldBan.setEditable(false);
-							jTextFieldNum.setText(String.valueOf(rs.getInt("num")));
-							jTextFieldNum.setEditable(false);
-							st_id = rs.getString("st_id");
-							distSql = "SELECT DISTINCT subject FROM Election_Cand";
-							distPstmt = con.prepareStatement(distSql);
-							distRsSize = distPstmt.executeQuery();
-							int rsSize = 0;
-							while(distRsSize.next()) {
-								rsSize++;
-							}
-							String subjectStr[] = new String[rsSize];
-							distSql = "SELECT DISTINCT subject FROM Election_Cand";
-							distPstmt = con.prepareStatement(distSql);
-							distRs = distPstmt.executeQuery();
-							while(distRs.next()) {
-								subjectStr[distRs.getRow()-1] = distRs.getString("subject");
-							}
-							countElec(subjectStr[0]);
-							jFrame.setVisible(true);
-							if(getFlag()){
-								centerPanel.removeAll();
-								countElec(subjectStr[1]);
-								jFrame.setVisible(true);
-							}
-						} else {
-							//System.out.println("b");
-						}
-				    } catch (Exception e) {
-				    	e.printStackTrace();
-				    }
+				    	rfcard = new String(readBuffer,1,10);
+				    	setRFcard(rfcard);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				    break;
 					}
 				}
@@ -170,8 +133,52 @@ public class ElectionMain implements Runnable{
 		} catch (Exception e) {}		
 		readThread = new Thread(this);
 		readThread.start();
-				 
 	}
+	public void setRFcard(String rfcard) {
+		centerAdd(rfcard);
+	}
+	
+	public void centerAdd(String rfcard) {
+		try {
+			con = dbConn();
+			sql = "SELECT name,class,ban,num,st_id FROM student WHERE rf_card_num='"+rfcard+"'";
+			Statement stmt = con.createStatement();
+			rs = stmt.executeQuery(sql);
+			if(rs.next()) {
+				centerPanel.remove(checkLabel);
+				jTextFieldName.setText(rs.getString("name"));
+				jTextFieldName.setEditable(false);
+				jTextFieldClass.setText(String.valueOf(rs.getInt("class")));
+				jTextFieldClass.setEditable(false);
+				jTextFieldBan.setText(String.valueOf(rs.getInt("ban")));
+				jTextFieldBan.setEditable(false);
+				jTextFieldNum.setText(String.valueOf(rs.getInt("num")));
+				jTextFieldNum.setEditable(false);
+				st_id = rs.getString("st_id");
+				distSql = "SELECT DISTINCT subject FROM Election_Cand";
+				distPstmt = con.prepareStatement(distSql);
+				distRsSize = distPstmt.executeQuery();
+				int rsSize = 0;
+				while(distRsSize.next()) {
+					rsSize++;
+				}
+				String subjectStr[] = new String[rsSize];
+				distSql = "SELECT DISTINCT subject FROM Election_Cand";
+				distPstmt = con.prepareStatement(distSql);
+				distRs = distPstmt.executeQuery();
+				while(distRs.next()) {
+					subjectStr[distRs.getRow()-1] = distRs.getString("subject");
+				}
+				countElec(subjectStr[0]);
+				jFrame.setVisible(true);	
+			} else {
+				//System.out.println("b");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public String getElecTitle(int i) {
 		con = dbConn();
 		sql = "SELECT DISTINCT(subject) FROM Election_Cand";
@@ -226,12 +233,12 @@ public class ElectionMain implements Runnable{
         return resizedImg;
 	}
 	
-	public Boolean getFlag() {
-		return this.flag;
-	}
-	
-	public void setFlag(Boolean flag) {
-		this.flag = flag;
+	public void setFlag() {
+		elecString.setText(getElecTitle(1));
+		centerPanel.removeAll();
+		countElec("2학년 학생회장");
+		jFrame.add(centerPanel);
+		jFrame.setVisible(true);
 	}
 	
 	public void countElec(String str) {
@@ -288,7 +295,11 @@ public class ElectionMain implements Runnable{
 							pstmt = con.prepareStatement(sql);
 							pstmt.executeUpdate();
 							elecText.setText("");
-							setFlag(true);
+							count++;
+							System.out.println(count);
+							if(count < 2){
+								setFlag();
+							}
 						} catch (SQLException e1) {
 							e1.printStackTrace();
 						} 

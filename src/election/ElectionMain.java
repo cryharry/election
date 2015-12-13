@@ -53,8 +53,8 @@ public class ElectionMain implements Runnable{
 	PreparedStatement pstmt, distPstmt;
 	ResultSet rs, rs2, rs3, distRs, distRsSize;
 	String sql = "", e_st = "", distSql = "", st_id = "";
-	String[] splitString;
-	Boolean flag = false;
+	String[] splitString, e_st_id, subjectStr;
+	Boolean flag = new Boolean(false);
 	JLabel elecString = new JLabel();
 	JLabel checkLabel = new JLabel("학생증을 체크해주세요!");
 	
@@ -117,7 +117,7 @@ public class ElectionMain implements Runnable{
 				    	while (input.available() > 0) {
 						    int numBytes = input.read(readBuffer);
 				    	}
-				    	rfcard = new String(readBuffer,1,10);
+				    	rfcard = new String(readBuffer,0,10);
 				    	setRFcard(rfcard);
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -135,11 +135,15 @@ public class ElectionMain implements Runnable{
 		readThread.start();
 	}
 	public void setRFcard(String rfcard) {
+		if(flag) {
+			centerPanel.removeAll();
+		}
 		centerAdd(rfcard);
 	}
 	
 	public void centerAdd(String rfcard) {
 		try {
+			flag = false;
 			con = dbConn();
 			sql = "SELECT name,class,ban,num,st_id FROM student WHERE rf_card_num='"+rfcard+"'";
 			Statement stmt = con.createStatement();
@@ -162,27 +166,28 @@ public class ElectionMain implements Runnable{
 				while(distRsSize.next()) {
 					rsSize++;
 				}
-				String subjectStr[] = new String[rsSize];
+				subjectStr = new String[rsSize];
 				distSql = "SELECT DISTINCT subject FROM Election_Cand";
 				distPstmt = con.prepareStatement(distSql);
 				distRs = distPstmt.executeQuery();
 				while(distRs.next()) {
 					subjectStr[distRs.getRow()-1] = distRs.getString("subject");
 				}
-				countElec(subjectStr[0]);
-				jFrame.setVisible(true);	
+				countElec(subjectStr[0]);	
 			} else {
 				//System.out.println("b");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			dbClose();
 		}
 	}
 	
 	public String getElecTitle(int i) {
-		con = dbConn();
-		sql = "SELECT DISTINCT(subject) FROM Election_Cand";
 		try {
+			con = dbConn();
+			sql = "SELECT DISTINCT(subject) FROM Election_Cand";
 			pstmt = con.prepareStatement(sql);
 			rs = pstmt.executeQuery();
 			String elecString = "";
@@ -192,7 +197,9 @@ public class ElectionMain implements Runnable{
 			splitString = elecString.split(",");	
 		} catch (SQLException e1) {
 			e1.printStackTrace();
-		} 
+		} finally {
+			dbClose();
+		}
 		return splitString[i];
 	}
 	
@@ -236,14 +243,14 @@ public class ElectionMain implements Runnable{
 	public void setFlag() {
 		elecString.setText(getElecTitle(1));
 		centerPanel.removeAll();
-		countElec("2학년 학생회장");
-		jFrame.add(centerPanel);
-		jFrame.setVisible(true);
+		countElec(subjectStr[1]);
+		flag = true;
 	}
 	
 	public void countElec(String str) {
-		sql = "SELECT st_id FROM Election_Cand WHERE subject='"+str+"'";
 		try {
+			con = dbConn();
+			sql = "SELECT st_id FROM Election_Cand WHERE subject='"+str+"'";
 			pstmt = con.prepareStatement(sql);
 			rs = pstmt.executeQuery();
 			int size = 0;
@@ -252,7 +259,7 @@ public class ElectionMain implements Runnable{
 			}
 			pstmt = con.prepareStatement(sql);
 			rs2 = pstmt.executeQuery();
-			String e_st_id[] = new String[size];
+			e_st_id = new String[size];
 			JPanel elecImage= new JPanel(new FlowLayout());
 			while(rs2.next()) {
 				e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
@@ -278,36 +285,42 @@ public class ElectionMain implements Runnable{
 				public void keyPressed(KeyEvent e) {
 					switch (e.getKeyCode()) {
 					case 97:
+					case 49:
 						e_st=e_st_id[0];
 						break;
 					case 98:
+					case 50:
 						e_st=e_st_id[1];
 						break;
 					case 99:
+					case 51:
 						e_st=e_st_id[2];
+						break;
+					case 10:
+						sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
+						try {
+							con = dbConn();
+							pstmt = con.prepareStatement(sql);
+							pstmt.executeUpdate();
+							elecText.setText("");
+							if(splitString.length > 1 && count == 0){
+								setFlag();
+								count++;
+							}
+						} catch (SQLException e1) {
+							e1.printStackTrace();
+						}
 						break;
 					default:
 						break;
 					}
-					if(e.getKeyCode() == 10) {
-						sql = "INSERT INTO Election_list(e_sel, st_id, e_st_id, e_date, e_time) VALUES ('A','"+st_id+"','"+e_st+"',getdate(),'000000')";
-						try {
-							pstmt = con.prepareStatement(sql);
-							pstmt.executeUpdate();
-							elecText.setText("");
-							count++;
-							System.out.println(count);
-							if(count < 2){
-								setFlag();
-							}
-						} catch (SQLException e1) {
-							e1.printStackTrace();
-						} 
-					}
 				}
 			});
+			jFrame.setVisible(true);
 		} catch (SQLException e2) {
 			e2.printStackTrace();
+		} finally {
+			dbClose();
 		}
 	}
 	

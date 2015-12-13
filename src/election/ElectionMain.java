@@ -106,6 +106,10 @@ public class ElectionMain implements Runnable{
 		jFrame.setVisible(true);
 		try {
 		    serialPort = (SerialPort) portId.open("SimpleReadApp", 2000);
+		    serialPort.notifyOnDataAvailable(true);
+		    serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, 
+					   SerialPort.STOPBITS_1, 
+					   SerialPort.PARITY_NONE);
 			input = serialPort.getInputStream();
 		    serialPort.addEventListener(new SerialPortEventListener() {
 				@Override
@@ -137,10 +141,6 @@ public class ElectionMain implements Runnable{
 					}
 				}
 			});
-		    serialPort.notifyOnDataAvailable(true);
-		    serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, 
-					   SerialPort.STOPBITS_1, 
-					   SerialPort.PARITY_NONE);
 		} catch (Exception e) {}		
 		readThread = new Thread(this);
 		readThread.start();
@@ -166,7 +166,10 @@ public class ElectionMain implements Runnable{
 				rs3 = pstmt.executeQuery();
 				if(rs3.next()) {
 					JOptionPane.showMessageDialog(jFrame, "이미 투표하셨습니다!");
-				} 
+					centerPanel.removeAll();
+					jFrame.setVisible(false);
+					jFrame.setVisible(true);
+				} else {
 				centerPanel.remove(checkLabel);
 				jTextFieldName.setText(rs.getString("name"));
 				jTextFieldName.setEditable(false);
@@ -194,6 +197,7 @@ public class ElectionMain implements Runnable{
 				countElec(subjectStr[0]);
 				jFrame.setVisible(false);
 				jFrame.setVisible(true);
+				}
 			} else {
 				checkLabel.setText("미등록카드입니다. 확인해주시길 바랍니다.");
 			}

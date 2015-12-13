@@ -1,6 +1,8 @@
 package election;
 
+import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Image;
@@ -19,25 +21,30 @@ import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.List;
 import javax.comm.*;
+import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
-
-import com.sun.xml.internal.bind.v2.runtime.reflect.Accessor.SetterOnlyReflection;
-
-import jdk.nashorn.internal.ir.Flags;
-
+import javax.swing.UIDefaults;
+import javax.swing.UIManager;
 
 public class ElectionMain implements Runnable{
+	Font myFont = new Font("나눔고딕", Font.BOLD, 20);
+	
+	private void initSwingProperties() {
+		UIDefaults defaults = UIManager.getDefaults();
+		defaults.put("Label.font", myFont);
+	}
+	
 	static CommPortIdentifier portId;
 	static Enumeration portList;
 	InputStream input;
 	SerialPort serialPort;
 	Thread readThread;
 	String rfcard;
-	int count = 0;
 	
 	JFrame jFrame = new JFrame("선거");
 	JPanel topPanel = new JPanel(new GridLayout(2,1));
@@ -48,17 +55,21 @@ public class ElectionMain implements Runnable{
 	JTextField jTextFieldBan = new JTextField(2);
 	JTextField jTextFieldNum = new JTextField(2);
 	JTextField elecText = new JTextField(2);
-	JLabel elecLabel = new JLabel("기호");
-	Connection con;
-	PreparedStatement pstmt, distPstmt;
-	ResultSet rs, rs2, rs3, distRs, distRsSize;
-	String sql = "", e_st = "", distSql = "", st_id = "";
+	JLabel elecLabel, elecString, checkLabel;
+	Connection con, con2;
+	PreparedStatement pstmt, distPstmt, namePstmt;
+	ResultSet rs, rs2, rs3, distRs, distRsSize, nameRS;
+	String sql = "", e_st = "", distSql = "", st_id = "", nameSql = "";
 	String[] splitString, e_st_id, subjectStr;
-	Boolean flag = new Boolean(false);
-	JLabel elecString = new JLabel();
-	JLabel checkLabel = new JLabel("학생증을 체크해주세요!");
+	Boolean flag = false;
+	JPanel elecImage;
+	int count = 0;
 	
-	public ElectionMain() { 
+	public ElectionMain() {
+		initSwingProperties();
+		elecString = new JLabel();
+		elecLabel = new JLabel("기 호");
+		checkLabel = new JLabel("학생증을 체크해주세요!");
 		JPanel elecTitle = new JPanel(new FlowLayout());
 		elecTitle.setSize(JFrame.MAXIMIZED_HORIZ, 100);
 		Calendar c =  Calendar.getInstance();
@@ -112,17 +123,17 @@ public class ElectionMain implements Runnable{
 				    break;
 				    
 					case SerialPortEvent.DATA_AVAILABLE:
-				    byte[] readBuffer = new byte[20];
-				    try {
-				    	while (input.available() > 0) {
-						    int numBytes = input.read(readBuffer);
-				    	}
-				    	rfcard = new String(readBuffer,0,10);
-				    	setRFcard(rfcard);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				    break;
+					    byte[] readBuffer = new byte[20];
+					    try {
+					    	while (input.available() > 0) {
+							    int numBytes = input.read(readBuffer);
+					    	}
+					    	rfcard = new String(readBuffer).substring(0,10).trim();
+					    	setRFcard(rfcard);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					    break;
 					}
 				}
 			});
@@ -134,6 +145,7 @@ public class ElectionMain implements Runnable{
 		readThread = new Thread(this);
 		readThread.start();
 	}
+	
 	public void setRFcard(String rfcard) {
 		if(flag) {
 			centerPanel.removeAll();
@@ -146,9 +158,15 @@ public class ElectionMain implements Runnable{
 			flag = false;
 			con = dbConn();
 			sql = "SELECT name,class,ban,num,st_id FROM student WHERE rf_card_num='"+rfcard+"'";
-			Statement stmt = con.createStatement();
-			rs = stmt.executeQuery(sql);
+			pstmt = con.prepareStatement(sql);
+			rs = pstmt.executeQuery();
 			if(rs.next()) {
+				sql = "SELECT * FROM Election_list WHERE st_id='"+rs.getString("st_id")+"'";
+				pstmt = con.prepareStatement(sql);
+				rs3 = pstmt.executeQuery();
+				if(rs3.next()) {
+					JOptionPane.showMessageDialog(jFrame, "이미 투표하셨습니다!");
+				} 
 				centerPanel.remove(checkLabel);
 				jTextFieldName.setText(rs.getString("name"));
 				jTextFieldName.setEditable(false);
@@ -173,9 +191,11 @@ public class ElectionMain implements Runnable{
 				while(distRs.next()) {
 					subjectStr[distRs.getRow()-1] = distRs.getString("subject");
 				}
-				countElec(subjectStr[0]);	
+				countElec(subjectStr[0]);
+				jFrame.setVisible(false);
+				jFrame.setVisible(true);
 			} else {
-				//System.out.println("b");
+				checkLabel.setText("미등록카드입니다. 확인해주시길 바랍니다.");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -260,18 +280,32 @@ public class ElectionMain implements Runnable{
 			pstmt = con.prepareStatement(sql);
 			rs2 = pstmt.executeQuery();
 			e_st_id = new String[size];
-			JPanel elecImage= new JPanel(new FlowLayout());
+			elecImage= new JPanel(new FlowLayout());
+			if(count != 0){
+				jFrame.setVisible(false);
+				jFrame.setVisible(true);
+			}
+			
 			while(rs2.next()) {
 				e_st_id[rs2.getRow()-1] = rs2.getString("st_id");
+				con2 = dbConn();
+				nameSql = "SELECT name FROM STUDENT WHERE st_id='"+rs2.getString("st_id")+"'";
+				namePstmt = con2.prepareStatement(nameSql);
+				nameRS = namePstmt.executeQuery();
 				String filePath = "C:\\Uni_cool\\image\\"+rs2.getString("st_id")+".jpg";
 				ImageIcon icon = new ImageIcon(filePath);
 				if(icon != null) {
-					ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 200, 200));
+					ImageIcon thumbnailIcon = new ImageIcon(getScaledImage(icon.getImage(), 300, 300));
 					elecImage.add(new JLabel(thumbnailIcon));
+					elecImage.add(new JLabel("기호["+rs2.getRow()+"]"));
+					if(nameRS.next()) {
+						elecImage.add(new JLabel(nameRS.getString("name")));
+					}
 				}
 				centerPanel.add(elecImage);
-			}		
+			}
 			jFrame.add(centerPanel);
+			count++;
 			elecText.requestFocus();
 			elecText.addKeyListener(new KeyListener() {
 				@Override
@@ -303,9 +337,8 @@ public class ElectionMain implements Runnable{
 							pstmt = con.prepareStatement(sql);
 							pstmt.executeUpdate();
 							elecText.setText("");
-							if(splitString.length > 1 && count == 0){
+							if(splitString.length > 1){
 								setFlag();
-								count++;
 							}
 						} catch (SQLException e1) {
 							e1.printStackTrace();

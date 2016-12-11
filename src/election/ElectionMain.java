@@ -341,7 +341,7 @@ public class ElectionMain implements Runnable{
 							pstmt = con.prepareStatement(sql);
 							pstmt.executeUpdate();
 							elecText.setText("");
-							if(splitString.length > 1){
+							if(splitString.length == 1){
 								setFlag();
 							}
 						} catch (SQLException e1) {
